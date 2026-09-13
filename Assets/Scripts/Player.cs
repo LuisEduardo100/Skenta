@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 
 public class Player : MonoBehaviour
 {
+  
     public float moveSpeed = 8f;
     public float jumpForce = 6f;
 
@@ -21,25 +22,37 @@ public class Player : MonoBehaviour
 
     private string currentAnimation = "";
 
-    // Evento de vida para notificar a UI ou outros sistemas
+
+    // SISTEMA DE VIDA
+
+    // Vida máxima e vida atual do jogador.
     public int maxHealth = 100;
     private int currentHealth;
+
+    // Evento que avisa outros sistemas quando a vida muda.
+    // Envia: vida atual e vida máxima.
     public event Action<int, int> OnHealthChanged;
+
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
 
+        // Define o tamanho inicial do jogador.
         transform.localScale = new Vector3(
             playerScale,
             playerScale,
             playerScale
         );
 
+        // Inicializa a vida.
         currentHealth = maxHealth;
+
+        // Avisa a UI que a vida foi inicializada.
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
+
 
     void Update()
     {
@@ -80,6 +93,7 @@ public class Player : MonoBehaviour
                 playerScale
             );
         }
+
         else if (horizontalInput < 0)
         {
             transform.localScale = new Vector3(
@@ -91,8 +105,8 @@ public class Player : MonoBehaviour
 
 
         SetAnimation();
-        Debug.Log(isGrounded);
     }
+
 
     void FixedUpdate()
     {
@@ -106,7 +120,6 @@ public class Player : MonoBehaviour
     void SetAnimation()
     {
         string newAnimation;
-
 
         if (!isGrounded)
         {
@@ -132,7 +145,6 @@ public class Player : MonoBehaviour
             }
         }
 
-
         if (currentAnimation != newAnimation)
         {
             animator.Play(newAnimation);
@@ -140,41 +152,71 @@ public class Player : MonoBehaviour
         }
     }
 
-    // Parte de Vida: Gerencia o dano e dispara o evento para a UI
+
+    // SISTEMA DE VIDA
+
+    // Causa dano ao jogador.
     public void TakeDamage(int amount)
     {
-        currentHealth = Mathf.Clamp(currentHealth - amount, 0, maxHealth);
+        // Impede a vida de ficar abaixo de 0.
+        currentHealth = Mathf.Clamp(
+            currentHealth - amount,
+            0,
+            maxHealth
+        );
+
+        // Avisa a UI e outros sistemas que a vida mudou.
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
-    // Parte de Vida: Gerencia a cura e dispara o evento para a UI
+
+    // Recupera vida do jogador.
     public void Heal(int amount)
     {
-        currentHealth = Mathf.Clamp(currentHealth + amount, 0, maxHealth);
+        // Impede a vida de ultrapassar o máximo.
+        currentHealth = Mathf.Clamp(
+            currentHealth + amount,
+            0,
+            maxHealth
+        );
+
+        // Avisa a UI que a vida mudou.
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
-    // Parte de Inventario: Chamado ao consumir um item do inventario (ex: pocao)
+
+    // SISTEMA DE INVENTÁRIO
+
+    // Método chamado quando o jogador utiliza um item.
     public void UseItem(string itemName)
     {
+        // Se o item for uma poção, recupera 20 de vida.
         if (itemName == "Potion")
         {
             Heal(20);
         }
     }
 
-    // Parte de Salvamento: Retorna os dados do jogador para serem salvos
+    // SISTEMA DE SALVAMENTO
+
+    // Retorna a vida atual para que o SaveSystem
+    // possa armazená-la.
     public int GetCurrentHealth()
     {
         return currentHealth;
     }
 
-    // Parte de Salvamento: Carrega e aplica os dados de vida salvos
+
+    // SISTEMA DE CARREGAMENTO
+    // Recebe a vida salva e aplica ao jogador.
     public void LoadHealth(int savedHealth)
     {
         currentHealth = savedHealth;
+
+        // Avisa a UI que a vida foi alterada.
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
+
 
     private void OnDrawGizmosSelected()
     {
