@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Game.Health;
 
 public class Player : MonoBehaviour
 {
@@ -25,9 +26,16 @@ public class Player : MonoBehaviour
 
     // SISTEMA DE VIDA
 
-    // Vida máxima e vida atual do jogador.
+    // A regra de vida não mora mais aqui dentro. Ela vem do pacote Game.Health,
+    // que é um módulo separado e coberto por testes. Este arquivo virou fachada:
+    // os métodos públicos continuam exatamente os mesmos, apenas repassam.
+    // Quem já usava Player.TakeDamage, Heal, GetCurrentHealth, LoadHealth
+    // ou OnHealthChanged não precisa mudar uma linha.
+
+    // Vida máxima do jogador. Continua sendo a fonte da verdade deste Inspector.
     public int maxHealth = 100;
-    private int currentHealth;
+
+    private HealthComponent health;
 
     // Evento que avisa outros sistemas quando a vida muda.
     // Envia: vida atual e vida máxima.
@@ -46,11 +54,19 @@ public class Player : MonoBehaviour
             playerScale
         );
 
-        // Inicializa a vida.
-        currentHealth = maxHealth;
+        // Liga o módulo de vida. Se o componente não foi colocado pelo Inspector,
+        // ele é criado aqui, então nenhuma cena precisa ser ajustada na mão.
+        health = GetComponent<HealthComponent>();
 
-        // Avisa a UI que a vida foi inicializada.
-        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        if (health == null)
+        {
+            health = gameObject.AddComponent<HealthComponent>();
+        }
+
+        health.Model.Changed += AoMudarVida;
+
+        // Aplica o maxHealth deste Inspector e começa com a vida cheia.
+        health.Restore(new HealthState(maxHealth, maxHealth));
     }
 
 
@@ -156,32 +172,47 @@ public class Player : MonoBehaviour
     // SISTEMA DE VIDA
 
     // Causa dano ao jogador.
+    // O clamp, a morte e o disparo dos eventos são responsabilidade do módulo.
     public void TakeDamage(int amount)
     {
-        // Impede a vida de ficar abaixo de 0.
-        currentHealth = Mathf.Clamp(
-            currentHealth - amount,
-            0,
-            maxHealth
-        );
-
-        // Avisa a UI e outros sistemas que a vida mudou.
-        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        health.TakeDamage(amount);
     }
 
 
     // Recupera vida do jogador.
+    // Atenção: pelo módulo, quem está morto não recupera vida com Heal.
+    // Para trazer de volta existe Revive, que é intenção diferente de curar.
     public void Heal(int amount)
     {
-        // Impede a vida de ultrapassar o máximo.
-        currentHealth = Mathf.Clamp(
-            currentHealth + amount,
-            0,
-            maxHealth
-        );
+        health.Heal(amount);
+    }
 
-        // Avisa a UI que a vida mudou.
-        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+
+    // Traz o jogador de volta com a vida cheia.
+    public void Revive()
+    {
+        health.Revive();
+    }
+
+
+    // Repassa toda mudança de vida para quem escuta.
+    private void AoMudarVida(HealthChange mudanca)
+    {
+        // Quem escutava o Player direto continua recebendo, como antes.
+        OnHealthChanged?.Invoke(mudanca.Current, mudanca.Max);
+
+        // E agora a mudança também sai no barramento central do projeto,
+        // para quem não conhece o Player.
+        EventManager.TriggerHealthChanged(mudanca.Current, mudanca.Max);
+    }
+
+
+    private void OnDestroy()
+    {
+        if (health != null && health.Model != null)
+        {
+            health.Model.Changed -= AoMudarVida;
+        }
     }
 
 
@@ -203,7 +234,7 @@ public class Player : MonoBehaviour
     // possa armazená-la.
     public int GetCurrentHealth()
     {
-        return currentHealth;
+        return health.Current;
     }
 
 
@@ -211,10 +242,9 @@ public class Player : MonoBehaviour
     // Recebe a vida salva e aplica ao jogador.
     public void LoadHealth(int savedHealth)
     {
-        currentHealth = savedHealth;
-
-        // Avisa a UI que a vida foi alterada.
-        OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        // Restore dispara o evento de mudança, então a UI se atualiza sozinha
+        // depois de carregar. O sistema de save não precisa avisar ninguém.
+        health.Restore(new HealthState(savedHealth, health.Max));
     }
 
 
