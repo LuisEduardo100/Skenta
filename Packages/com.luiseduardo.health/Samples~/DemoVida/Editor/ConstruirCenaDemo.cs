@@ -16,7 +16,6 @@ public static class ConstruirCenaDemo
 
     static readonly Color Fundo   = new Color(0.07f, 0.08f, 0.11f);
     static readonly Color Painel  = new Color(0.11f, 0.13f, 0.17f, 0.92f);
-    static readonly Color Trilho  = new Color(0.19f, 0.21f, 0.26f);
     static readonly Color Botao1  = new Color(0.22f, 0.25f, 0.32f);
     static readonly Color Claro   = new Color(0.88f, 0.90f, 0.94f);
 
@@ -45,7 +44,7 @@ public static class ConstruirCenaDemo
                 typeof(UnityEngine.EventSystems.StandaloneInputModule));
 
         var fonte = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var arredondado = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        var solido = UiSprites.Solido();
 
         // ---------- HUD no canto superior direito ----------
         var hudGO = Vazio(canvasGO.transform, "HUD", new Vector2(1, 1), new Vector2(-36, -28), new Vector2(300, 86));
@@ -65,23 +64,12 @@ public static class ConstruirCenaDemo
         }
 
         float larguraBarra = Coracoes * ladoCoracao + (Coracoes - 1) * espaco;
-        var trilho = Grafico(hudGO, "Trilho", arredondado, Trilho,
-            new Vector2(1, 1), new Vector2(0, -64), new Vector2(larguraBarra, 12));
-        trilho.type = Image.Type.Sliced;
-
-        var barra = Grafico(trilho.rectTransform, "Barra", arredondado, Color.white,
-            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(larguraBarra, 12));
-        barra.type = Image.Type.Filled;
-        barra.fillMethod = Image.FillMethod.Horizontal;
-        barra.fillOrigin = (int)Image.OriginHorizontal.Left;
-        barra.fillAmount = 1f;
 
         var hud = hudGO.gameObject.AddComponent<HealthHud>();
 
         // ---------- registro de acoes no canto inferior esquerdo ----------
-        var painel = Grafico(canvasGO.transform, "Registro", arredondado, Painel,
+        var painel = Grafico(canvasGO.transform, "Registro", solido, Painel,
             new Vector2(0, 0), new Vector2(28, 28), new Vector2(430, 208));
-        painel.type = Image.Type.Sliced;
         painel.rectTransform.pivot = new Vector2(0, 0);
         painel.rectTransform.anchoredPosition = new Vector2(28, 28);
 
@@ -103,11 +91,11 @@ public static class ConstruirCenaDemo
         string[] nomes = { "Dano", "Cura", "Matar", "Reviver" };
         var botoes = new Button[nomes.Length];
         for (int i = 0; i < nomes.Length; i++)
-            botoes[i] = BotaoUI(canvasGO.transform, nomes[i], fonte, arredondado,
+            botoes[i] = BotaoUI(canvasGO.transform, nomes[i], fonte, solido,
                 new Vector2(0.5f, 0), new Vector2(-285f + i * 190f, 56), new Vector2(170, 48));
 
         // ---------- ligacoes ----------
-        Ligar(hud, ("grupo", hudGO), ("opacidade", opacidade), ("barra", barra));
+        Ligar(hud, ("grupo", hudGO), ("opacidade", opacidade));
         LigarArray(hud, "fundos", fundos);
         LigarArray(hud, "frentes", frentes);
 
@@ -201,7 +189,6 @@ public static class ConstruirCenaDemo
                           Vector2 ancora, Vector2 pos, Vector2 tam)
     {
         var img = Grafico(pai, "Botao " + rotulo, sprite, Botao1, ancora, pos, tam);
-        img.type = Image.Type.Sliced;
         img.raycastTarget = true;
         var btn = img.gameObject.AddComponent<Button>();
         btn.targetGraphic = img;

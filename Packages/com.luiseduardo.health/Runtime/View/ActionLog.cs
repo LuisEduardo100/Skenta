@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Game.Health.Demo
+namespace Game.Health
 {
     /// <summary>
     /// Painel de registro das acoes. Mostra as ultimas linhas, com hora, cor por tipo
@@ -17,7 +17,7 @@ namespace Game.Health.Demo
     /// </summary>
     public class ActionLog : MonoBehaviour
     {
-        public enum Tipo { Dano, Cura, Morte, Revive, Sistema }
+        public enum Tipo { Dano, Cura, Morte, Revive, Ataque, Item, Sistema }
 
         [SerializeField] Text texto;
         [SerializeField] int maximoLinhas = 8;
@@ -37,6 +37,8 @@ namespace Game.Health.Demo
             Tipo.Cura   => new Color(0.29f, 0.87f, 0.50f),
             Tipo.Morte  => new Color(0.97f, 0.44f, 0.44f),
             Tipo.Revive => new Color(0.38f, 0.65f, 0.98f),
+            Tipo.Ataque => new Color(0.99f, 0.75f, 0.30f),
+            Tipo.Item   => new Color(0.70f, 0.55f, 0.98f),
             _           => new Color(0.58f, 0.64f, 0.72f)
         };
 
@@ -46,6 +48,8 @@ namespace Game.Health.Demo
             Tipo.Cura   => "CURA",
             Tipo.Morte  => "MORTE",
             Tipo.Revive => "REVIVE",
+            Tipo.Ataque => "GOLPE",
+            Tipo.Item   => "ITEM",
             _           => "INFO"
         };
 

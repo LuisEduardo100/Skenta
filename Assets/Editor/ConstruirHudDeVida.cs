@@ -5,12 +5,13 @@ using UnityEngine.UI;
 using Game.Health;
 
 /// <summary>
-/// Monta o HUD de vida por codigo, salva como prefab e coloca uma instancia na cena.
+/// Monta a interface do jogo por codigo e salva como prefab unico.
 ///
-/// Por que por codigo e nao arrastando na mao: prefab e cena sao YAML enorme e ilegivel,
-/// entao duas pessoas mexendo geram conflito impossivel de resolver. Um script que constroi
-/// e codigo normal, com diff revisavel, e nasce identico em qualquer maquina.
-/// Se o HUD quebrar, roda o menu de novo.
+/// Tres cantos, tres papeis:
+///   superior direito  vida em coracoes e pocoes, o que o jogador olha de relance
+///   inferior esquerdo registro de acoes, o que ele le depois
+///   inferior direito  teclas disponiveis, o que ele consulta quando esquece
+/// O centro fica livre, porque o centro pertence ao jogo.
 /// </summary>
 public static class ConstruirHudDeVida
 {
@@ -18,12 +19,24 @@ public static class ConstruirHudDeVida
     const string CaminhoPrefab = PastaUI + "/HealthHUD.prefab";
     const string CaminhoCena = "Assets/Scenes/GameScene.unity";
     const int Coracoes = 5;
+    const int Pocoes = 5;
 
-    static readonly Color Trilho = new Color(0.15f, 0.16f, 0.20f, 0.85f);
+    static readonly Color FundoPainel = new Color(0.07f, 0.08f, 0.11f, 0.78f);
+    static readonly Color Titulo      = new Color(0.42f, 0.48f, 0.58f);
+    static readonly Color Tecla       = new Color(0.98f, 0.80f, 0.35f);
+    static readonly Color Acao        = new Color(0.80f, 0.84f, 0.90f);
 
     [MenuItem("Game/Health/Construir HUD de vida")]
     public static void Construir()
     {
+        if (EditorApplication.isPlaying)
+        {
+            EditorUtility.DisplayDialog("HUD de vida",
+                "Pare o Play antes de construir o HUD.\n\nO Unity nao deixa trocar de cena com o jogo rodando.",
+                "Entendi");
+            return;
+        }
+
         var prefab = GerarPrefab();
         ColocarNaCena(prefab);
     }
@@ -41,45 +54,12 @@ public static class ConstruirHudDeVida
         scaler.referenceResolution = new Vector2(1280, 720);
         scaler.matchWidthOrHeight = 0.5f;
 
-        var arredondado = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        var fonte = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var solido = UiSprites.Solido();
 
-        const float lado = 40f, espaco = 6f;
-        float largura = Coracoes * lado + (Coracoes - 1) * espaco;
-
-        var grupo = Vazio(raiz.transform, "Grupo", new Vector2(1, 1), new Vector2(-28, -22), new Vector2(largura, 62));
-        var opacidade = grupo.gameObject.AddComponent<CanvasGroup>();
-
-        var fundos = new Image[Coracoes];
-        var frentes = new Image[Coracoes];
-
-        for (int i = 0; i < Coracoes; i++)
-        {
-            float x = -(Coracoes - 1 - i) * (lado + espaco);
-            var slot = Vazio(grupo, $"Coracao {i}", new Vector2(1, 1), new Vector2(x, 0), new Vector2(lado, lado));
-            fundos[i] = Grafico(slot, "Fundo", null, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(lado, lado));
-            frentes[i] = Grafico(slot, "Frente", null, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(lado, lado));
-        }
-
-        var trilho = Grafico(grupo, "Trilho", arredondado, Trilho, new Vector2(1, 1), new Vector2(0, -50), new Vector2(largura, 8));
-        trilho.type = Image.Type.Sliced;
-
-        var barra = Grafico(trilho.rectTransform, "Barra", arredondado, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(largura, 8));
-        barra.type = Image.Type.Filled;
-        barra.fillMethod = Image.FillMethod.Horizontal;
-        barra.fillOrigin = (int)Image.OriginHorizontal.Left;
-        barra.fillAmount = 1f;
-
-        var hud = raiz.AddComponent<HealthHud>();
-        raiz.AddComponent<HealthHudBinder>();
-        raiz.AddComponent<TesteDeDano>();
-
-        var so = new SerializedObject(hud);
-        so.FindProperty("grupo").objectReferenceValue = grupo;
-        so.FindProperty("opacidade").objectReferenceValue = opacidade;
-        so.FindProperty("barra").objectReferenceValue = barra;
-        PreencherArray(so, "fundos", fundos);
-        PreencherArray(so, "frentes", frentes);
-        so.ApplyModifiedPropertiesWithoutUndo();
+        MontarVida(raiz, solido);
+        MontarRegistro(raiz, fonte, solido);
+        MontarControles(raiz, fonte, solido);
 
         System.IO.Directory.CreateDirectory(PastaUI);
         var prefab = PrefabUtility.SaveAsPrefabAsset(raiz, CaminhoPrefab);
@@ -89,13 +69,115 @@ public static class ConstruirHudDeVida
         return prefab;
     }
 
+    // ---------------- canto superior direito ----------------
+
+    static void MontarVida(GameObject raiz, Sprite solido)
+    {
+        const float lado = 40f, espaco = 6f;
+        float largura = Coracoes * lado + (Coracoes - 1) * espaco;
+
+        var grupo = Vazio(raiz.transform, "Vida", new Vector2(1, 1), new Vector2(-28, -22), new Vector2(largura, 92));
+        var opacidade = grupo.gameObject.AddComponent<CanvasGroup>();
+
+        var fundos = new Image[Coracoes];
+        var frentes = new Image[Coracoes];
+
+        for (int i = 0; i < Coracoes; i++)
+        {
+            float x = -(Coracoes - 1 - i) * (lado + espaco);
+            var slot = Vazio(grupo, $"Coracao {i}", new Vector2(1, 1), new Vector2(x, 0), new Vector2(lado, lado));
+            fundos[i]  = Grafico(slot, "Fundo",  null, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(lado, lado));
+            frentes[i] = Grafico(slot, "Frente", null, Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(lado, lado));
+        }
+
+        // fileira de frascos logo abaixo dos coracoes
+        const float ladoFrasco = 26f, espacoFrasco = 4f;
+        var frascos = new Image[Pocoes];
+
+        for (int i = 0; i < Pocoes; i++)
+        {
+            float x = -(Pocoes - 1 - i) * (ladoFrasco + espacoFrasco);
+            frascos[i] = Grafico(grupo, $"Pocao {i}", null, Color.white,
+                new Vector2(1, 1), new Vector2(x, -50), new Vector2(ladoFrasco, ladoFrasco));
+        }
+
+        var painelPocoes = grupo.gameObject.AddComponent<PainelDePocoes>();
+        var soPocoes = new SerializedObject(painelPocoes);
+        PreencherArray(soPocoes, "frascos", frascos);
+        soPocoes.ApplyModifiedPropertiesWithoutUndo();
+
+        var hud = raiz.AddComponent<HealthHud>();
+        raiz.AddComponent<HealthHudBinder>();
+
+        var so = new SerializedObject(hud);
+        so.FindProperty("grupo").objectReferenceValue = grupo;
+        so.FindProperty("opacidade").objectReferenceValue = opacidade;
+        PreencherArray(so, "fundos", fundos);
+        PreencherArray(so, "frentes", frentes);
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // ---------------- canto inferior esquerdo ----------------
+
+    static void MontarRegistro(GameObject raiz, Font fonte, Sprite solido)
+    {
+        var painel = Grafico(raiz.transform, "Registro", solido, FundoPainel,
+            new Vector2(0, 0), new Vector2(24, 24), new Vector2(430, 196));
+
+        var cabecalho = Texto(painel.rectTransform, "Cabecalho", "REGISTRO DE ACOES", fonte, 12,
+            new Vector2(0, 1), new Vector2(14, -8), new Vector2(240, 16), TextAnchor.UpperLeft);
+        cabecalho.color = Titulo;
+
+        var linhas = Texto(painel.rectTransform, "Linhas", "", fonte, 14,
+            new Vector2(0, 0), Vector2.zero, Vector2.zero, TextAnchor.LowerLeft);
+        Esticar(linhas.rectTransform, 14, 12, 14, 30);
+        linhas.horizontalOverflow = HorizontalWrapMode.Overflow;
+        linhas.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var log = painel.gameObject.AddComponent<ActionLog>();
+        painel.gameObject.AddComponent<LogBinder>();
+
+        var so = new SerializedObject(log);
+        so.FindProperty("texto").objectReferenceValue = linhas;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // ---------------- canto inferior direito ----------------
+
+    static void MontarControles(GameObject raiz, Font fonte, Sprite solido)
+    {
+        var painel = Grafico(raiz.transform, "Controles", solido, FundoPainel,
+            new Vector2(1, 0), new Vector2(-24, 24), new Vector2(248, 150));
+
+        var cabecalho = Texto(painel.rectTransform, "Cabecalho", "CONTROLES", fonte, 12,
+            new Vector2(0, 1), new Vector2(14, -8), new Vector2(160, 16), TextAnchor.UpperLeft);
+        cabecalho.color = Titulo;
+
+        var teclas = Texto(painel.rectTransform, "Teclas", "A D\nESPACO\nJ\nE\nR", fonte, 14,
+            new Vector2(0, 1), new Vector2(14, -30), new Vector2(74, 100), TextAnchor.UpperRight);
+        teclas.color = Tecla;
+        teclas.lineSpacing = 1.25f;
+
+        var acoes = Texto(painel.rectTransform, "Acoes", "mover\npular\ngolpe de espada\nbeber pocao\nreviver",
+            fonte, 14, new Vector2(0, 1), new Vector2(98, -30), new Vector2(140, 100), TextAnchor.UpperLeft);
+        acoes.color = Acao;
+        acoes.lineSpacing = 1.25f;
+        acoes.horizontalOverflow = HorizontalWrapMode.Overflow;
+
+        var painelControles = painel.gameObject.AddComponent<PainelDeControles>();
+        var so = new SerializedObject(painelControles);
+        so.FindProperty("colunaDeAcoes").objectReferenceValue = acoes;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // ---------------- cena ----------------
+
     static void ColocarNaCena(GameObject prefab)
     {
         var cena = EditorSceneManager.OpenScene(CaminhoCena, OpenSceneMode.Single);
 
-        // se ja existe um HUD na cena, substitui em vez de duplicar
-        foreach (var raiz in cena.GetRootGameObjects())
-            if (raiz.name == "HealthHUD") Object.DestroyImmediate(raiz);
+        foreach (var obj in cena.GetRootGameObjects())
+            if (obj.name == "HealthHUD") Object.DestroyImmediate(obj);
 
         var instancia = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         instancia.name = "HealthHUD";
@@ -104,6 +186,8 @@ public static class ConstruirHudDeVida
         EditorSceneManager.SaveScene(cena);
         Debug.Log($"[hud] instancia colocada em {CaminhoCena}");
     }
+
+    // ---------------- ajudantes ----------------
 
     static void PreencherArray(SerializedObject so, string campo, Object[] valores)
     {
@@ -124,6 +208,15 @@ public static class ConstruirHudDeVida
         return rt;
     }
 
+    static void Esticar(RectTransform rt, float esq, float baixo, float dir, float cima)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = new Vector2(esq, baixo);
+        rt.offsetMax = new Vector2(-dir, -cima);
+    }
+
     static RectTransform Vazio(Transform pai, string nome, Vector2 ancora, Vector2 pos, Vector2 tam)
         => Posicionar(pai, new GameObject(nome, typeof(RectTransform)), ancora, pos, tam);
 
@@ -136,5 +229,21 @@ public static class ConstruirHudDeVida
         img.color = cor;
         img.raycastTarget = false;
         return img;
+    }
+
+    static Text Texto(Transform pai, string nome, string valor, Font fonte, int tamanho,
+                      Vector2 ancora, Vector2 pos, Vector2 tam, TextAnchor alinhamento)
+    {
+        var go = new GameObject(nome, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        Posicionar(pai, go, ancora, pos, tam);
+        var t = go.GetComponent<Text>();
+        t.font = fonte;
+        t.fontSize = tamanho;
+        t.text = valor;
+        t.alignment = alinhamento;
+        t.supportRichText = true;
+        t.color = Acao;
+        t.raycastTarget = false;
+        return t;
     }
 }

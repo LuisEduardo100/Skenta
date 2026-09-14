@@ -5,16 +5,16 @@ using UnityEngine.UI;
 namespace Game.Health
 {
     /// <summary>
-    /// HUD de vida: fileira de coracoes e barra fina.
+    /// HUD de vida: fileira de coracoes.
     /// So desenha e anima. Nenhuma regra de vida mora aqui.
     /// </summary>
+    [ExecuteAlways]
     public class HealthHud : MonoBehaviour
     {
         [SerializeField] RectTransform grupo;
         [SerializeField] CanvasGroup opacidade;
         [SerializeField] Image[] fundos;
         [SerializeField] Image[] frentes;
-        [SerializeField] Image barra;
 
         static readonly Color Cheio  = new Color(0.93f, 0.26f, 0.36f);
         static readonly Color Vazio  = new Color(0.21f, 0.14f, 0.18f);
@@ -26,8 +26,21 @@ namespace Game.Health
         Coroutine batida, tremor;
         readonly Coroutine[] pulsos = new Coroutine[8];
 
+        // ExecuteAlways faz o Awake rodar tambem no editor, fora do Play.
+        // Sem isso os coracoes so aparecem depois de apertar Play, e a cena
+        // fica com cinco quadrados brancos, que parece bug e nao e.
         void Awake()
         {
+            // Em play mode, AddComponent dispara o Awake na hora, antes de quem
+            // esta montando o objeto conseguir ligar os campos. Sem esta guarda
+            // isso vira NullReferenceException e o componente nasce quebrado.
+            if (grupo == null || fundos == null || frentes == null ||
+                fundos.Length == 0 || frentes.Length == 0)
+            {
+                enabled = false;
+                return;
+            }
+
             var coracao = HeartSprite.Obter();
 
             foreach (var img in fundos)
@@ -46,6 +59,9 @@ namespace Game.Health
             }
 
             ancoraOriginal = grupo.anchoredPosition;
+
+            // no editor, mostra a vida cheia para a cena nao parecer quebrada
+            if (!Application.isPlaying) Desenhar(100, 100);
         }
 
         /// <summary>Redesenha sem animar. Usado no primeiro quadro e ao carregar estado.</summary>
@@ -56,12 +72,10 @@ namespace Game.Health
                 frentes[i].fillAmount = Mathf.Clamp01((atual - i * porCoracao) / porCoracao);
 
             float n = max <= 0 ? 0f : (float)atual / max;
-            barra.fillAmount = n;
 
             bool morto = atual <= 0;
             Color tom = morto ? Morto : Cheio;
             foreach (var img in frentes) img.color = tom;
-            barra.color = morto ? Morto : (n <= 0.25f ? Alerta : Cheio);
 
             opacidade.alpha = morto ? 0.55f : 1f;
 
@@ -91,6 +105,7 @@ namespace Game.Health
         public void AnimarRevive(int atual, int max)
         {
             Desenhar(atual, max);
+            if (!Application.isPlaying) return;
             StartCoroutine(Cascata());
         }
 
@@ -114,6 +129,7 @@ namespace Game.Health
 
         void Pulsar(int indice, Color flash, float escala)
         {
+            if (!Application.isPlaying) return;
             if (indice < 0 || indice >= frentes.Length) return;
             if (pulsos[indice] != null) StopCoroutine(pulsos[indice]);
             pulsos[indice] = StartCoroutine(RotinaPulso(indice, flash, escala));
@@ -143,6 +159,7 @@ namespace Game.Health
 
         void Tremer(float duracao = 0.18f, float forca = 9f)
         {
+            if (!Application.isPlaying) return;
             if (tremor != null) StopCoroutine(tremor);
             tremor = StartCoroutine(RotinaTremor(duracao, forca));
         }
@@ -174,6 +191,7 @@ namespace Game.Health
                 foreach (var img in frentes) img.rectTransform.localScale = Vector3.one;
                 return;
             }
+            if (!Application.isPlaying) return;
             if (batida == null) batida = StartCoroutine(RotinaBatida());
         }
 
